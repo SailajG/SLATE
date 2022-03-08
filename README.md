@@ -2,12 +2,12 @@
 
 Getting started (after copying code to your computer):
 
-1. Install Flask. Commands below from https://flask.palletsprojects.com/en/2.0.x/quickstart/
+1. Copy code to your computer
 
-2. From terminal: export FLASK_APP=main
+2. In terminal: pip install -r requirements.txt
 
-3. From terminal: flask run
+3. From vscode terminal: python app.py
 
-4. In browser go to: http://127.0.0.1:5000/
+4. In browser go to: http://localhost:5000/
 
 
