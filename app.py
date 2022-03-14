@@ -3,6 +3,8 @@ import json
 import os
 import sqlite3
 
+import datetime
+
 # Third-party libraries
 from flask import Flask, redirect, request, url_for
 from flask_login import (
@@ -19,6 +21,13 @@ import requests
 # Internal imports
 from db import init_db_command
 from user import User
+
+
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1' #Allows website to use http instead of https
 
@@ -56,6 +65,13 @@ except sqlite3.OperationalError:
 
 # OAuth 2 client setup
 client = WebApplicationClient(GOOGLE_CLIENT_ID)
+
+SCOPES = [
+        "openid", 
+        "https://www.googleapis.com/auth/userinfo.email", 
+        "https://www.googleapis.com/auth/userinfo.profile", 
+        'https://www.googleapis.com/auth/calendar.readonly'
+        ]
 
 # Flask-Login helper to retrieve a user from our db
 @login_manager.user_loader
@@ -102,11 +118,30 @@ def index(user_id=None, start_date=None):
 
         info += "</h1>"
 
+        
+
         return_body += info
 
-        #Get times from database
-        times = get_times(0,0)
+        service = build('calendar', 'v3', credentials=creds)
 
+        # Call the Calendar API
+        now = datetime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
+        print('Getting the upcoming 10 events')
+        events_result = service.events().list(calendarId='primary', timeMin=now,
+                                              maxResults=10, singleEvents=True,
+                                              orderBy='startTime').execute()
+        events = events_result.get('items', [])
+
+        if not events:
+            print('No upcoming events found.')
+            return
+
+        # Prints the start and name of the next 10 events
+        for event in events:
+            start = event['start'].get('dateTime', event['start'].get('date'))
+            return_body += start
+            return_body += event['summary']
+        
         return_body += create_schedule(times)
 
         return (
@@ -131,63 +166,20 @@ def get_google_provider_cfg():
 
 @app.route("/login")
 def login():
-    # Find out what URL to hit for Google login
-    google_provider_cfg = get_google_provider_cfg()
-    authorization_endpoint = google_provider_cfg["authorization_endpoint"]
-
-    # Use library to construct the request for Google login and provide
-    # scopes that let you retrieve user's profile from Google
-    request_uri = client.prepare_request_uri(
-        authorization_endpoint,
-        redirect_uri=request.base_url + "/callback",
-        scope=["openid", "email", "profile"],
-    )
-    return redirect(request_uri)
-
-
-#Login callback
-@app.route("/login/callback")
-def callback():
-    # Get authorization code Google sent back to you
-    code = request.args.get("code")
-
-    # Find out what URL to hit to get tokens that allow you to ask for
-    # things on behalf of a user
-    google_provider_cfg = get_google_provider_cfg()
-    token_endpoint = google_provider_cfg["token_endpoint"]
-
-    # Prepare and send a request to get tokens! Yay tokens!
-    token_url, headers, body = client.prepare_token_request(
-        token_endpoint,
-        authorization_response=request.url,
-        redirect_url=request.base_url,
-        code=code
-    )
-    token_response = requests.post(
-        token_url,
-        headers=headers,
-        data=body,
-        auth=(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET),
-    )
-
-    # Parse the tokens!
-    client.parse_request_body_response(json.dumps(token_response.json()))
+    flow = InstalledAppFlow.from_client_secrets_file(
+                'credentials.json', SCOPES)
     
-    # Now that you have tokens (yay) let's find and hit the URL
-    # from Google that gives you the user's profile information,
-    # including their Google profile image and email
-    userinfo_endpoint = google_provider_cfg["userinfo_endpoint"]
-    uri, headers, body = client.add_token(userinfo_endpoint)
-    userinfo_response = requests.get(uri, headers=headers, data=body)
+    global creds 
+    creds = flow.run_local_server(port=0,redirect_uri_trailing_slash=False)
+   
+    oauth2_client = build('oauth2', 'v2',credentials=creds)
+    user_info = oauth2_client.userinfo().get().execute()
 
-    # You want to make sure their email is verified.
-    # The user authenticated with Google, authorized your
-    # app, and now you've verified their email through Google!
-    if userinfo_response.json().get("email_verified"):
-        unique_id = userinfo_response.json()["sub"]
-        users_email = userinfo_response.json()["email"]
-        picture = userinfo_response.json()["picture"]
-        users_name = userinfo_response.json()["given_name"]
+    if user_info["verified_email"]:
+        unique_id = user_info["id"]
+        users_email = user_info["email"]
+        picture = user_info["picture"]
+        users_name = user_info["given_name"]
     else:
         return "User email not available or not verified by Google.", 400
 
@@ -204,6 +196,7 @@ def callback():
     # Begin user session by logging the user in
     login_user(user)
 
+  
     # Send user back to homepage
     return redirect(url_for("index"))
 
@@ -305,4 +298,3 @@ def process_schedule(times:list):
 if __name__ == "__main__":
     app.run(debug=True)
     
-
