@@ -105,14 +105,14 @@ def index(user_id=None, start_date=None):
                                               maxResults=10, singleEvents=True,
                                               orderBy='startTime').execute()
         events = events_result.get('items', [])
-        return render_template("schedule.html", 
-        schedule=schedule.create_schedule(times,events),
-        title = schedule.title(), 
-        prev=schedule.prev_week(),
-        next=schedule.next_week())
+        return render_template("index.html", 
+            schedule=schedule.create_schedule(times,events),
+            title = schedule.title(), 
+            prev=schedule.prev_week(),
+            next=schedule.next_week())
         
     else:
-        return '<a class="button" href="/login">Google Login</a>'
+        return render_template("index.html")
 
 
 #Login page
