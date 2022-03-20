@@ -47,7 +47,7 @@ GOOGLE_DISCOVERY_URL = (
 )
 
 # Flask app setup
-app = Flask(__name__,template_folder='Templates')
+app = Flask(__name__,template_folder='templates')
 app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(24)
 app.config['SERVER_NAME'] = 'localhost:5000'
 
