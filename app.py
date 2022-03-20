@@ -6,7 +6,7 @@ import sqlite3
 import datetime
 
 # Third-party libraries
-from flask import Flask, redirect, request, url_for
+from flask import Flask, redirect, request, url_for, render_template
 from flask_login import (
     LoginManager,
     current_user,
@@ -70,7 +70,7 @@ SCOPES = [
         "openid", 
         "https://www.googleapis.com/auth/userinfo.email", 
         "https://www.googleapis.com/auth/userinfo.profile", 
-        'https://www.googleapis.com/auth/calendar.readonly'
+        'https://www.googleapis.com/auth/restndar.readonly'
         ]
 
 # Flask-Login helper to retrieve a user from our db
@@ -155,7 +155,8 @@ def index(user_id=None, start_date=None):
             )
         )
     else:
-        return '<a class="button" href="/login">Google Login</a>'
+        return render_template('index.html')
+    
 
 
 #Login page
@@ -284,7 +285,7 @@ def get_times(user_id, start_date):
     """
     return []
 
-def process_schedule(times:list):
+def process_schedule(times):
     """Updates database with times the user is free
 
     Input parameters:
