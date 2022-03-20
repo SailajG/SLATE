@@ -70,7 +70,7 @@ SCOPES = [
         "openid", 
         "https://www.googleapis.com/auth/userinfo.email", 
         "https://www.googleapis.com/auth/userinfo.profile", 
-        'https://www.googleapis.com/auth/restndar.readonly'
+        'https://www.googleapis.com/auth/calendar.readonly'
         ]
 
 # Flask-Login helper to retrieve a user from our db
