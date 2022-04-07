@@ -57,7 +57,7 @@ mysql = MySQL()
 app.config['MYSQL_DATABASE_USER'] = 'root'
 app.config['MYSQL_DATABASE_PASSWORD'] = 'BrickCloudRed#99'
 app.config['MYSQL_DATABASE_DB'] = 'social_calendar'
-app.config['MYSQL_DATABASE_HOST'] = 'localhost'
+app.config['MYSQL_DATABASE_HOST'] = '34.105.209.85'
 mysql.init_app(app)
 
 # User session management setup
