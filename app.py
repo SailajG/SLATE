@@ -19,7 +19,6 @@ from oauthlib.oauth2 import WebApplicationClient
 import requests
 
 # Internal imports
-from db import init_db_command
 from user import User 
 from schedule import Schedule
 
@@ -29,6 +28,8 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+#For DB
+from flaskext.mysql import MySQL
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1' #Allows website to use http instead of https
 
 # Get google api details
@@ -51,17 +52,32 @@ app = Flask(__name__,template_folder='templates')
 app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(24)
 app.config['SERVER_NAME'] = 'localhost:5000'
 
+#Setup db
+mysql = MySQL()
+app.config['MYSQL_DATABASE_USER'] = 'root'
+app.config['MYSQL_DATABASE_PASSWORD'] = 'BrickCloudRed#99'
+app.config['MYSQL_DATABASE_DB'] = 'social_calendar'
+app.config['MYSQL_DATABASE_HOST'] = 'localhost'
+mysql.init_app(app)
+
 # User session management setup
 # https://flask-login.readthedocs.io/en/latest
 login_manager = LoginManager()
 login_manager.init_app(app)
 
-# Naive database setup
-try:
-    init_db_command()
-except sqlite3.OperationalError:
-    # Assume it's already been created
-    pass
+conn = mysql.connect()
+cursor = conn.cursor()
+cursor.execute(''' SELECT * FROM user ''')
+rows = cursor.fetchall()
+ 
+#Saving the Actions performed on the DB
+conn.commit()
+ 
+#Closing the cursor
+cursor.close()
+print("rows", rows)
+
+
 
 # OAuth 2 client setup
 client = WebApplicationClient(GOOGLE_CLIENT_ID)
@@ -76,7 +92,7 @@ SCOPES = [
 # Flask-Login helper to retrieve a user from our db
 @login_manager.user_loader
 def load_user(user_id):
-    return User.get(user_id)
+    return User.get(user_id, conn)
 
 
 
@@ -101,8 +117,10 @@ def index(user_id=None, start_date=None):
 
         # Call the Calendar API   
         service = build('calendar', 'v3', credentials=creds)
-        events_result = service.events().list(calendarId='primary', timeMin=((schedule.minTime).isoformat() + 'Z'), timeMax=((schedule.maxTime).isoformat() + 'Z'),
-                                              maxResults=10, singleEvents=True,
+        events_result = service.events().list(calendarId='primary', 
+                                              timeMin=((schedule.minTime).isoformat() + 'Z'), 
+                                              timeMax=((schedule.maxTime).isoformat() + 'Z'),
+                                              singleEvents=True,
                                               orderBy='startTime').execute()
         events = events_result.get('items', [])
         return render_template("index.html", 
@@ -143,12 +161,12 @@ def login():
     # Create a user in your db with the information provided
     # by Google
     user = User(
-        id_=unique_id, name=users_name, email=users_email, profile_pic=picture
+        id_=unique_id, name=users_name, email=users_email
     )
 
     # Doesn't exist? Add it to the database.
-    if not User.get(unique_id):
-        User.create(unique_id, users_name, users_email, picture)
+    if not User.get(unique_id, conn):
+        User.create(unique_id, users_name, users_email, conn)
 
     # Begin user session by logging the user in
     login_user(user)
