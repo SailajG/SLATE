@@ -1,4 +1,25 @@
-# slate
+# SLATE 
+An oppurtunity for friends to have #hustle free meetings 
+
+# Contents
+
+* About
+* Architecture
+* Front End
+     * FLASK Framework 
+     * HTML and CSS for Styling
+* Back End
+     * CRUD operations
+     * cloud database with MySQL
+* Running Locally
+
+
+# About
+SLATE is an amazing Calender App by which we can share our calendars with friends and plan meetings with them accordingly , Great app for keep up balance with friends and our own meetings. 
+
+
+     
+
 
 Getting started (after copying code to your computer):
 
