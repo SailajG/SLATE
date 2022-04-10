@@ -50,7 +50,7 @@ GOOGLE_DISCOVERY_URL = (
 # Flask app setup
 app = Flask(__name__,template_folder='templates')
 app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(24)
-app.config['SERVER_NAME'] = 'localhost:5000'
+app.config['SERVER_NAME'] = '127.0.0.1:5000'
 
 #Setup db
 mysql = MySQL()
@@ -97,7 +97,7 @@ def load_user(user_id):
 
 
 
-#Homepage
+#Handle GET requests for schedule
 @app.route("/")
 @app.route("/schedule", methods=["POST", "GET"])
 @app.route("/schedule/user=<user_id>", methods=["POST", "GET"])
@@ -105,15 +105,11 @@ def load_user(user_id):
 @app.route("/schedule/user=<user_id>/date=<start_date>", methods=["POST", "GET"])
 def index(user_id=None, start_date=None):
     if current_user.is_authenticated:
-
+        print("logged-in")
         schedule = Schedule(userId = current_user.id, requestStart = start_date, requestUserId = user_id)
 
         #Initialize variables
         times = []
-
-        #Handle submission of the schedule
-        if request.method == 'POST':
-            process_schedule(sorted(request.values.getlist('times')))
 
         # Call the Calendar API   
         service = build('calendar', 'v3', credentials=creds)
@@ -124,12 +120,13 @@ def index(user_id=None, start_date=None):
                                               orderBy='startTime').execute()
         events = events_result.get('items', [])
         return render_template("index.html", 
-            schedule=schedule.create_schedule(times,events),
+            schedule=schedule.create_schedule(times,events,conn),
             title = schedule.title(), 
             prev=schedule.prev_week(),
             next=schedule.next_week())
         
     else:
+        print("Log-in")
         return render_template("index.html")
 
 
@@ -153,7 +150,6 @@ def login():
     if user_info["verified_email"]:
         unique_id = user_info["id"]
         users_email = user_info["email"]
-        picture = user_info["picture"]
         users_name = user_info["given_name"]
     else:
         return "User email not available or not verified by Google.", 400
@@ -209,17 +205,40 @@ def get_times(user_id, start_date):
     """
     return []
 
-def process_schedule(times:list):
-    """Updates database with times the user is free
+""" Sailaj and Lorenzo add your code here """
 
-    Input parameters:
-    time list -- array of integer id's corresponding to 1 hour slots where the user is free.
-
-    Return parameters:
+@app.route("/schedule/delete/user=<user_id>/date=<start_date>", methods=["POST", "GET"])
+def delete_schedule(user_id, start_date):
     """
-    print("Saved times to database: ", times)
-    return request
+    """
+    print("user_id", current_user.id)
+    print("start_date", start_date)
     
+
+    return redirect(url_for("index"))
+
+@app.route("/schedule/add/user=<user_id>/date=<start_date>", methods=["POST", "GET"])
+def insert_schedule(user_id, start_date):
+    """
+    """
+    print("user_id", current_user.id)
+    print("start_date", start_date)
+    print("free_times", sorted(request.values.getlist('times')))
+    
+
+    return redirect("/schedule/date="+str(start_date))
+
+@app.route("/schedule/update/user=<user_id>/date=<start_date>", methods=["POST", "GET"])
+def update_schedule(user_id, start_date):
+    """
+    """
+    print("user_id", current_user.id)
+    print("start_date", request.args.get('date'))
+    print("free_times", sorted(request.values.getlist('times')))
+    
+
+    return redirect("/schedule/date="+str(request.args.get('date')))
+
 
 def view_friends(friends=[]):
     """Outputs table of friends.
