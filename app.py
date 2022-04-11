@@ -123,8 +123,9 @@ def index(user_id=None, start_date=None):
                                               singleEvents=True,
                                               orderBy='startTime').execute()
         events = events_result.get('items', [])
-        return render_template("index.html", 
-            schedule=schedule.create_schedule(times,events),
+        return render_template("schedule.html", 
+            events = schedule.get_events(events),
+            schedule=schedule.create_schedule(times),
             title = schedule.title(), 
             prev=schedule.prev_week(),
             next=schedule.next_week())

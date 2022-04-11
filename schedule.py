@@ -1,5 +1,7 @@
 import datetime as dt
 
+from flask import render_template
+
 class Schedule:
     def __init__(self, userId, requestStart, requestUserId):
         self.format = "%d%m%Y"
@@ -27,16 +29,16 @@ class Schedule:
             title += name + "'s "
         else:
             
-            title += "My"
+            title += "MY"
   
-        title += " free time"
+        title += " FREE TIME"
 
 
         #Check if schedule is for current week
         if self.currentWeekMinTime == self.minTime:
-            title += " for current week"
+            title += " FOR CURRENT WEEK"
         else:
-            title += " for week commencing " + self.minTime.strftime("%a %d %b")
+            title += " FOR WEEK COMMENCING " + self.minTime.strftime("%a %d %b")
         
         return title
     
@@ -46,7 +48,16 @@ class Schedule:
     def next_week(self):
         return (self.minTime + dt.timedelta(days = 7)).strftime(self.format)
 
-    def create_schedule(self, times=[], events=[]):
+    def get_events(self, events=[]):
+        test_calendar_body = ""
+        for event in events:
+            start = event['start'].get('dateTime', event['start'].get('date'))
+            test_calendar_body += start
+            test_calendar_body += event['summary']
+        return test_calendar_body
+
+
+    def create_schedule(self, times=[] ):
         """Outputs a schedule for the week. Times the user is free are checked.
 
         Input parameters:
@@ -56,13 +67,9 @@ class Schedule:
         str -- HTML string of table
         """
 
-        test_calendar_body = ""
-        for event in events:
-            start = event['start'].get('dateTime', event['start'].get('date'))
-            test_calendar_body += start
-            test_calendar_body += event['summary']
+        
 
-        htmlArray = [test_calendar_body, "<form action='' method='POST'> <table><tr><th>Time</th><th>Mon</th><th>Tues</th><th>Wed</th><th>Thur</th><th>Fri</th><th>Sat</th><th>Sun</th>"]
+        htmlArray = [ "<form action='' method='POST'> <table><thead><tr><th>Time</th><th>Mon</th><th>Tues</th><th>Wed</th><th>Thur</th><th>Fri</th><th>Sat</th><th>Sun</th></thead><tbody>"]
 
         i = 0
         for i in range(7*24):
@@ -86,8 +93,8 @@ class Schedule:
             
             i = i + 1
 
-        htmlArray.append("</tr></table> <input type='submit' value='Submit'> </form>")
+        htmlArray.append("</tr></tbody></table> <input type='submit' value='Submit'> </form>")
 
         html = ' '.join(htmlArray)
-
+         
         return html
