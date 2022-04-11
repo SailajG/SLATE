@@ -19,18 +19,18 @@ from oauthlib.oauth2 import WebApplicationClient
 import requests
 
 # Internal imports
-from user import User 
+from user import User
 from schedule import Schedule
-
 
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-#For DB
+# For DB
 from flaskext.mysql import MySQL
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1' #Allows website to use http instead of https
+
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'  # Allows website to use http instead of https
 
 # Get google api details
 GOOGLE_CLIENT_ID = "631412287723-9aren88160fka6hivsqith535hhu8c3v.apps.googleusercontent.com"
@@ -48,11 +48,11 @@ GOOGLE_DISCOVERY_URL = (
 )
 
 # Flask app setup
-app = Flask(__name__,template_folder='templates')
+app = Flask(__name__, template_folder='templates')
 app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(24)
-app.config['SERVER_NAME'] = 'localhost:5000'
+app.config['SERVER_NAME'] = '127.0.0.1:5000'
 
-#Setup db
+# Setup db
 mysql = MySQL()
 app.config['MYSQL_DATABASE_USER'] = 'root'
 app.config['MYSQL_DATABASE_PASSWORD'] = 'BrickCloudRed#99'
@@ -69,25 +69,24 @@ conn = mysql.connect()
 cursor = conn.cursor()
 cursor.execute(''' SELECT * FROM user ''')
 rows = cursor.fetchall()
- 
-#Saving the Actions performed on the DB
+
+# Saving the Actions performed on the DB
 conn.commit()
- 
-#Closing the cursor
+
+# Closing the cursor
 cursor.close()
 print("rows", rows)
-
-
 
 # OAuth 2 client setup
 client = WebApplicationClient(GOOGLE_CLIENT_ID)
 
 SCOPES = [
-        "openid", 
-        "https://www.googleapis.com/auth/userinfo.email", 
-        "https://www.googleapis.com/auth/userinfo.profile", 
-        'https://www.googleapis.com/auth/calendar.readonly'
-        ]
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    'https://www.googleapis.com/auth/calendar.readonly'
+]
+
 
 # Flask-Login helper to retrieve a user from our db
 @login_manager.user_loader
@@ -95,9 +94,7 @@ def load_user(user_id):
     return User.get(user_id, conn)
 
 
-
-
-#Homepage
+# Handle GET requests for schedule
 @app.route("/")
 @app.route("/schedule", methods=["POST", "GET"])
 @app.route("/schedule/user=<user_id>", methods=["POST", "GET"])
@@ -105,36 +102,33 @@ def load_user(user_id):
 @app.route("/schedule/user=<user_id>/date=<start_date>", methods=["POST", "GET"])
 def index(user_id=None, start_date=None):
     if current_user.is_authenticated:
+        print("logged-in")
+        schedule = Schedule(userId=current_user.id, requestStart=start_date, requestUserId=user_id)
 
-        schedule = Schedule(userId = current_user.id, requestStart = start_date, requestUserId = user_id)
-
-        #Initialize variables
+        # Initialize variables
         times = []
-
-        #Handle submission of the schedule
-        if request.method == 'POST':
-            process_schedule(sorted(request.values.getlist('times')))
 
         # Call the Calendar API   
         service = build('calendar', 'v3', credentials=creds)
-        events_result = service.events().list(calendarId='primary', 
-                                              timeMin=((schedule.minTime).isoformat() + 'Z'), 
+        events_result = service.events().list(calendarId='primary',
+                                              timeMin=((schedule.minTime).isoformat() + 'Z'),
                                               timeMax=((schedule.maxTime).isoformat() + 'Z'),
                                               singleEvents=True,
                                               orderBy='startTime').execute()
         events = events_result.get('items', [])
         return render_template("schedule.html", 
             events = schedule.get_events(events),
-            schedule=schedule.create_schedule(times),
+            schedule=schedule.create_schedule(times,conn),
             title = schedule.title(), 
             prev=schedule.prev_week(),
             next=schedule.next_week())
         
     else:
+        print("Log-in")
         return render_template("index.html")
 
 
-#Login page
+# Login page
 def get_google_provider_cfg():
     """Add error handling"""
     return requests.get(GOOGLE_DISCOVERY_URL).json()
@@ -143,18 +137,17 @@ def get_google_provider_cfg():
 @app.route("/login")
 def login():
     flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
-    
-    global creds 
-    creds = flow.run_local_server(port=0,redirect_uri_trailing_slash=False)
-   
-    oauth2_client = build('oauth2', 'v2',credentials=creds)
+        'credentials.json', SCOPES)
+
+    global creds
+    creds = flow.run_local_server(port=0, redirect_uri_trailing_slash=False)
+
+    oauth2_client = build('oauth2', 'v2', credentials=creds)
     user_info = oauth2_client.userinfo().get().execute()
 
     if user_info["verified_email"]:
         unique_id = user_info["id"]
         users_email = user_info["email"]
-        picture = user_info["picture"]
         users_name = user_info["given_name"]
     else:
         return "User email not available or not verified by Google.", 400
@@ -172,11 +165,11 @@ def login():
     # Begin user session by logging the user in
     login_user(user)
 
-  
     # Send user back to homepage
     return redirect(url_for("index"))
 
-#Logout
+
+# Logout
 @app.route("/logout")
 @login_required
 def logout():
@@ -197,6 +190,7 @@ def get_times(user_id, start_date):
     """
     return []
 
+
 def get_times(user_id, start_date):
     """Get list of free time slots from database corresponding to input user_id and start_date.
 
@@ -210,17 +204,108 @@ def get_times(user_id, start_date):
     """
     return []
 
-def process_schedule(times:list):
-    """Updates database with times the user is free
 
-    Input parameters:
-    time list -- array of integer id's corresponding to 1 hour slots where the user is free.
+""" Sailaj did add his code here ;-) """
 
-    Return parameters:
+
+@app.route("/schedule/delete/user=<user_id>/date=<start_date>", methods=["POST", "GET"])
+def delete_schedule(user_id, start_date):
     """
-    print("Saved times to database: ", times)
-    return request
-    
+    """
+    print("user_id", current_user.id)
+    print("start_date", start_date)
+
+    # Check that the table exists before attempting to insert any records
+    sql = """SELECT * FROM information_schema.columns
+                 WHERE table_schema = 'social_calendar' 
+                    AND table_name = 'user_schedule'
+                 LIMIT 1;"""
+    cursor.execute(sql)
+    response = cursor.fetchone()
+    if response is not None:
+        print(f'DB Table Exists: {response}')
+        sql = "DELETE FROM user_schedule WHERE user_id = %s, week_start_date = %s , free_time = %s"
+        for row in sorted(request.values.getlist('times')):
+            data = (current_user.id, start_date, row)
+            print(f'Each Record: {data}')
+            cursor.execute(sql, data)
+        conn.commit()
+    else:
+        print('DB Table does not exist. Delete Aborted!')
+
+    return redirect(url_for("index"))
+
+
+@app.route("/schedule/add/user=<user_id>/date=<start_date>", methods=["POST", "GET"])
+def insert_schedule(user_id, start_date):
+    """
+    """
+    print("user_id", current_user.id)
+    print("start_date", start_date)
+    print("free_times", sorted(request.values.getlist('times')))
+
+    cursor = conn.cursor()
+
+    # Create table if not exists
+    sql = """create table if not exists user_schedule
+            (
+                user_id         int       not null,
+                week_start_date varchar(10)      not null,
+                free_time       varchar(10)       not null,
+                primary key (user_id, week_start_date, free_time)
+            )"""
+    cursor.execute(sql)
+    conn.commit()
+
+    # Check that the table exists before attempting to insert any records
+    sql = """SELECT * FROM information_schema.columns
+             WHERE table_schema = 'social_calendar' 
+                AND table_name = 'user_schedule'
+             LIMIT 1;"""
+    cursor.execute(sql)
+    response = cursor.fetchone()
+    if response is not None:
+        print(f'DB Table Exists: {response}')
+        sql = "INSERT INTO user_schedule(user_id, week_start_date, free_time) VALUES (%s, %s, %s)"
+        for row in sorted(request.values.getlist('times')):
+            data = (current_user.id, start_date, row)
+            print(f'Each Record: {data}')
+            cursor.execute(sql, data)
+        conn.commit()
+    else:
+        print('DB Table does not exist. Insert Aborted!')
+
+    return redirect("/schedule/date=" + str(start_date))
+
+
+@app.route("/schedule/update/user=<user_id>/date=<start_date>", methods=["POST", "GET"])
+def update_schedule(user_id, start_date):
+    """
+    """
+    print("user_id", current_user.id)
+    print("start_date", request.args.get('date'))
+    print("free_times", sorted(request.values.getlist('times')))
+
+    # Check that the table exists before attempting to insert any records
+    sql = """SELECT * FROM information_schema.columns
+                 WHERE table_schema = 'social_calendar' 
+                    AND table_name = 'user_schedule'
+                 LIMIT 1;"""
+    cursor.execute(sql)
+    response = cursor.fetchone()
+    if response is not None:
+        print(f'DB Table Exists: {response}')
+        sql = "REPLACE INTO user_schedule(user_id,week_start_date,free_time) VALUES (%s %s %s)"
+        for row in sorted(request.values.getlist('times')):
+            data = (current_user.id, start_date, row)
+            print(f'Each Record: {data}')
+            cursor.execute(sql, data)
+        conn.commit()
+    else:
+        print('DB Table does not exist. Update Aborted!')
+
+    return redirect("/schedule/date=" + str(request.args.get('date')))
+
 
 def view_friends(friends=[]):
     """Outputs table of friends.
@@ -232,8 +317,7 @@ def view_friends(friends=[]):
     string -- HTML of freinds table
     """
     return ""
-        
+
 
 if __name__ == "__main__":
     app.run(debug=True)
-    

@@ -4,8 +4,9 @@ from flask import render_template
 
 class Schedule:
     def __init__(self, userId, requestStart, requestUserId):
-        self.format = "%d%m%Y"
+        self.format = "%Y-%m-%d"
         self.currentWeekMinTime = dt.datetime.combine(dt.datetime.today() - dt.timedelta(days = dt.datetime.today().weekday()),dt.time.min)
+        self.startDate = self.currentWeekMinTime.strftime(self.format)
         #Get start datetime from url date
         if requestStart != None:
             self.minTime = dt.datetime.combine(dt.datetime.strptime(requestStart, self.format).date(), dt.time.min)
@@ -18,6 +19,22 @@ class Schedule:
         self.userId = userId
         self.requestUserId = requestUserId
         
+    @staticmethod
+    def get(self, conn):
+        """
+            Checks if a schedule exists for the user and week in the database.
+            Returns HTTP status code 200 if it does and 404 if it does not.
+        """
+        cursor = conn.cursor()
+        sql = "SELECT * FROM free_time WHERE user_id = %s AND week_start_date = %s"
+        data = (self.userId, self.startDate)
+        cursor.execute(sql, data)
+        schedule = cursor.fetchone()
+        print(schedule)
+        if not schedule:
+            return False
+        else:
+            return True
 
     def title(self):
         title = ""
@@ -43,10 +60,12 @@ class Schedule:
         return title
     
     def prev_week(self):
-        return (self.minTime - dt.timedelta(days = 7)).strftime(self.format)
+        self.startDate = (self.minTime - dt.timedelta(days = 7)).strftime(self.format)
+        return self.startDate
     
     def next_week(self):
-        return (self.minTime + dt.timedelta(days = 7)).strftime(self.format)
+        self.startDate = (self.minTime + dt.timedelta(days = 7)).strftime(self.format)
+        return self.startDate
 
     def get_events(self, events=[]):
         test_calendar_body = ""
@@ -57,7 +76,7 @@ class Schedule:
         return test_calendar_body
 
 
-    def create_schedule(self, times=[] ):
+    def create_schedule(self, times=[], conn="" ):
         """Outputs a schedule for the week. Times the user is free are checked.
 
         Input parameters:
@@ -66,10 +85,18 @@ class Schedule:
         Returns:
         str -- HTML string of table
         """
+        url_end = "/user="+str(self.userId)+"/date="+str(self.minTime.strftime(self.format))+""
+        if self.get(self, conn):
+            submit_url = "/schedule/update" + url_end
+            submit_name = "Update" 
+        else:
+            submit_url = "/schedule/add" + url_end
+            submit_name = "Insert" 
+
 
         
 
-        htmlArray = [ "<form action='' method='POST'> <table><thead><tr><th>Time</th><th>Mon</th><th>Tues</th><th>Wed</th><th>Thur</th><th>Fri</th><th>Sat</th><th>Sun</th></thead><tbody>"]
+        htmlArray = [ "<form action='" + submit_url + "' method='POST'> <table><thead><tr><th>Time</th><th>Mon</th><th>Tues</th><th>Wed</th><th>Thur</th><th>Fri</th><th>Sat</th><th>Sun</th></thead><tbody>"]
 
         i = 0
         for i in range(7*24):
@@ -93,7 +120,11 @@ class Schedule:
             
             i = i + 1
 
-        htmlArray.append("</tr></tbody></table> <input type='submit' value='Submit'> </form>")
+        htmlArray.append("</tr></tbody></table> <input type='submit' value='"+submit_name+"'> </form>")
+        print("test:", self.userId)
+        delete_url = "/schedule/delete" + url_end
+        print(delete_url)
+        htmlArray.append("<a href= '"+delete_url+"'> Delete </a>")
 
         html = ' '.join(htmlArray)
          
