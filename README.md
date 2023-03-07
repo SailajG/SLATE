@@ -34,7 +34,7 @@ $ python app.py
 Launch `http://127.0.0.1:5000/`
 
 # Depolyment
-- Creating docker application of the image.
+- Creating docker image of the application.
 - Push the docker image to gcr.io registry.
 - Deployment of application in GKE cluster.
 - Creating horizontal pod scaling for the application.
